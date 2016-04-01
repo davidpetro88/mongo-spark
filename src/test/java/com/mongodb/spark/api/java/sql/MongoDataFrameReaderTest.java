@@ -20,7 +20,8 @@ import com.mongodb.spark.api.java.MongoSpark;
 import com.mongodb.spark.api.java.RequiresMongoDB;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.sql.DataFrame;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SQLContext;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -58,12 +59,12 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(_idField, ageField, nameField));
 
         // When
-        DataFrame df = MongoSpark.read(new SQLContext(jsc)).load();
+        Dataset<Row> ds = MongoSpark.read(new SQLContext(jsc)).load();
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
     @Test
@@ -74,12 +75,12 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(_idField, ageField, nameField));
 
         // When
-        DataFrame df = MongoSpark.load(MongoSpark.read(new SQLContext(jsc)));
+        Dataset<Row> ds = MongoSpark.load(MongoSpark.read(new SQLContext(jsc)));
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
     @Test
@@ -90,12 +91,12 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(_idField, ageField, nameField));
 
         // When
-        DataFrame df = new SQLContext(jsc).read().format("com.mongodb.spark.sql").load();
+        Dataset<Row> ds =new SQLContext(jsc).read().format("com.mongodb.spark.sql").load();
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
     @Test
@@ -109,20 +110,20 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(_idField, ageField, nameField));
 
         // When
-        DataFrame df = sqlContext.read().format("com.mongodb.spark.sql").option("pipeline", "{ $match: { name: { $exists: true } } }").load();
+        Dataset<Row> ds =sqlContext.read().format("com.mongodb.spark.sql").option("pipeline", "{ $match: { name: { $exists: true } } }").load();
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
 
         // When - single item pipeline
-        df = sqlContext.read().format("com.mongodb.spark.sql").option("pipeline", "{ $match: { name: { $exists: true } } }").load();
+        ds =sqlContext.read().format("com.mongodb.spark.sql").option("pipeline", "{ $match: { name: { $exists: true } } }").load();
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
     @Test
@@ -133,12 +134,12 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(ageField, nameField));
 
         // When
-        DataFrame df = MongoSpark.load(MongoSpark.read(new SQLContext(jsc)), Character.class);
+        Dataset<Row> ds = MongoSpark.load(MongoSpark.read(new SQLContext(jsc)), Character.class);
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
 
@@ -150,12 +151,12 @@ public final class MongoDataFrameReaderTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(ageField, nameField));
 
         // When
-        DataFrame df = MongoSpark.load(jsc).toDF(Character.class);
+        Dataset<Row> ds = MongoSpark.load(jsc).toDF(Character.class);
 
         // Then
-        assertEquals(df.schema(), expectedSchema);
-        assertEquals(df.count(), 10);
-        assertEquals(df.filter("age > 100").count(), 6);
+        assertEquals(ds.schema(), expectedSchema);
+        assertEquals(ds.count(), 10);
+        assertEquals(ds.filter("age > 100").count(), 6);
     }
 
     @Test(expected = IllegalArgumentException.class)

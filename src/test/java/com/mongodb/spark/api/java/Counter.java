@@ -28,4 +28,20 @@ public final class Counter implements Serializable {
     public void setCounter(final Integer counter) {
         this.counter = counter;
     }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Counter counter1 = (Counter) o;
+
+        return counter != null ? counter.equals(counter1.counter) : counter1.counter == null;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return counter != null ? counter.hashCode() : 0;
+    }
 }

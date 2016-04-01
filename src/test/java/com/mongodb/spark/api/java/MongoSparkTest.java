@@ -25,9 +25,9 @@ import org.apache.spark.SparkException;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.MapFunction;
-import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.catalyst.JavaTypeInference;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
@@ -131,7 +131,7 @@ public final class MongoSparkTest extends RequiresMongoDB {
         StructType expectedSchema = createStructType(asList(_idField, countField));
 
         // when
-        DataFrame dataFrame = mongoRDD.toDF();
+        Dataset<Row> dataFrame = mongoRDD.toDF();
 
         // then
         assertEquals(dataFrame.schema(), expectedSchema);
@@ -148,7 +148,7 @@ public final class MongoSparkTest extends RequiresMongoDB {
         StructType expectedSchema = (StructType) JavaTypeInference.inferDataType(Counter.class)._1();
 
         // when
-        DataFrame dataFrame = mongoRDD.toDF(Counter.class);
+        Dataset<Row> dataFrame = mongoRDD.toDF(Counter.class);
 
         // then
         assertEquals(dataFrame.schema(), expectedSchema);
@@ -206,24 +206,10 @@ public final class MongoSparkTest extends RequiresMongoDB {
         JavaMongoRDD<Document> mongoRDD = MongoSpark.load(jsc);
 
         // when
-        Dataset<Counter> dataset = mongoRDD.toDS(Counter.class);
-
-        Dataset<Integer> test = dataset.map(new MapFunction<Counter, Integer>() {
-            @Override
-            public Integer call(final Counter counter) throws Exception {
-                return counter.getCounter();
-            }
-        }, Encoders.INT());
-
-        System.out.println(test.collectAsList());
+        Dataset<Counter> ds = mongoRDD.toDS(Counter.class);
 
         // then - default values
-        assertEquals(dataset.map(new MapFunction<Counter, Integer>(){
-            @Override
-            public Integer call(final Counter counter) throws Exception {
-                return counter.getCounter();
-            }
-        }, Encoders.INT()).collectAsList(), asList(null, null));
+        assertEquals(ds.collectAsList(), asList(new Counter(), new Counter()));
     }
 
 }

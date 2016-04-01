@@ -26,7 +26,8 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function;
-import org.apache.spark.sql.DataFrame;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SQLContext;
 import org.bson.Document;
 
@@ -127,22 +128,22 @@ public final class JavaIntroduction {
 
         // Load inferring schema
         SQLContext sqlContext = new SQLContext(jsc);
-        DataFrame df = sqlContext.read().format("com.mongodb.spark.sql").load();
+        Dataset<Row> df = sqlContext.read().format("com.mongodb.spark.sql").load();
         df.printSchema();
         df.show();
 
         // Via JavaMongoRDD
-        DataFrame rddDf = MongoSpark.load(sqlContext).toDF();
+        Dataset<Row> rddDf = MongoSpark.load(sqlContext).toDF();
         rddDf.printSchema();
         df.show();
 
         // Declare the Schema via a Java Bean
-        DataFrame explicitDF = MongoSpark.load(sqlContext).toDF(Character.class);
+        Dataset<Row> explicitDF = MongoSpark.load(sqlContext).toDF(Character.class);
         explicitDF.printSchema();
 
         // SQL
         explicitDF.registerTempTable("characters");
-        DataFrame centenarians = sqlContext.sql("SELECT name, age FROM characters WHERE age >= 100");
+        Dataset<Row> centenarians = sqlContext.sql("SELECT name, age FROM characters WHERE age >= 100");
 
         // Saving DataFrame
         MongoSpark.write(centenarians).option("collection", "hundredClub").save();
