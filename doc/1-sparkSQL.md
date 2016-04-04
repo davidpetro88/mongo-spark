@@ -45,7 +45,7 @@ First enable the Mongo Connector specific functions on the `SQLContext`:
 import com.mongodb.spark.sql._
 ```
 
-### DataFrames and DataSets
+### Datasets
 
 Creating a DataFrame is easy using the implicit `mongo` helper on the `DataFrameReader`:
 
@@ -64,7 +64,9 @@ root
 ```
 
 -----
-*Note:* The `sqlContext.read.mongo()` implicit function is the equivalent of `sqlContext.read.format("com.mongodb.spark.sql").load()`
+*Note:* In Spark 2.0 a `DataFrame` is a type Alias of `Dataset[Row]`.
+
+The `sqlContext.read.mongo()` implicit function is the equivalent of `sqlContext.read.format("com.mongodb.spark.sql").load()`.
 
 -----
 
