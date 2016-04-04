@@ -11,7 +11,8 @@ You can run the interactive sparkR shell like so:
 ```
 ./bin/sparkR  --conf "spark.mongodb.input.uri=mongodb://127.0.0.1/test.coll?readPreference=primaryPreferred" \
               --conf "spark.mongodb.output.uri=mongodb://127.0.0.1/test.coll" \
-              --packages org.mongodb.spark:mongo-spark-connector_2.10:0.1
+              --packages org.mongodb.spark:mongo-spark-connector_2.10:2.0.0-SNAPSHOT \
+              --repositories https://oss.sonatype.org/content/repositories/snapshots
 ```
 
 ## The Spark R API Basics

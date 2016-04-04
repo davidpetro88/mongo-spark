@@ -21,7 +21,8 @@
 # ./bin/spark-submit --master "local[4]"  \
 #                    --conf "spark.mongodb.input.uri=mongodb://127.0.0.1/test.coll?readPreference=primaryPreferred" \
 #                    --conf "spark.mongodb.output.uri=mongodb://127.0.0.1/test.coll" \
-#                    --packages org.mongodb.spark:mongo-spark-connector_2.10:0.1 \
+#                    --packages org.mongodb.spark:mongo-spark-connector_2.10:2.0.0-SNAPSHOT \
+#                    --repositories https://oss.sonatype.org/content/repositories/snapshots \
 #                    introduction.py
 
 from pyspark import SparkConf, SparkContext
