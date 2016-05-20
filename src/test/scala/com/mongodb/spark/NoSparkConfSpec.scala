@@ -14,14 +14,28 @@
  * limitations under the License.
  */
 
-package com.mongodb.spark.sql
+package com.mongodb.spark
 
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
 
-import com.mongodb.spark.RequiresMongoDB
+import org.bson.Document
+import com.mongodb.spark.config.{ReadConfig, WriteConfig}
+import com.mongodb.spark.sql._
+import com.mongodb.spark.sql.Character
 
-class MongoDataFrameNoConfSpec extends RequiresMongoDB {
+class NoSparkConfSpec extends RequiresMongoDB {
+
+  "MongoRDD" should "be able to accept just Read / Write Configs" in {
+    val writeConfig = WriteConfig(Map("uri" -> mongoClientURI, "database" -> databaseName, "collection" -> collectionName))
+    val readConfig = ReadConfig(Map("uri" -> mongoClientURI, "database" -> databaseName, "collection" -> collectionName))
+
+    val documents = sc.parallelize((1 to 10).map(i => Document.parse(s"{test: $i}")))
+    documents.saveToMongoDB(writeConfig = writeConfig)
+
+    sc.loadFromMongoDB(readConfig = readConfig).count() should equal(10) //scalastyle:ignore
+    sc.loadFromMongoDB(readConfig = readConfig).map(_.getInteger("test")).collect().toList should equal((1 to 10).toList)
+  }
 
   "DataFrame Readers and Writers" should "be able to accept just options" in {
     val characters = Seq(Character("Gandalf", 1000), Character("Bilbo Baggins", 50)) //scalastyle:ignore
@@ -44,15 +58,10 @@ class MongoDataFrameNoConfSpec extends RequiresMongoDB {
     ds.collect().toList should equal(characters)
   }
 
-  private lazy val sc: SparkContext = {
-    new SparkContext(
-      new SparkConf()
-        .setMaster("local")
-        .setAppName("MongoSparkConnector")
-    )
-  }
+  val sc: SparkContext = new SparkContext(new SparkConf().setMaster("local").setAppName("MongoSparkConnector"))
 
-  override def beforeEach() {}
+  override def beforeEach(): Unit = {
+  }
 
   override def afterAll() {
     super.afterAll()
