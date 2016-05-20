@@ -22,4 +22,11 @@ import org.bson.BsonDocument
 /**
  * An identifier for a partition in a MongoRDD.
  */
-private[rdd] case class MongoPartition(index: Int, queryBounds: BsonDocument, locations: Seq[String] = Nil) extends Partition
+private[rdd] case class MongoPartition(index: Int, queryBounds: BsonDocument, locations: Seq[String] = Nil) extends Partition {
+  override def hashCode(): Int = super.hashCode()
+
+  override def equals(other: Any): Boolean = other match {
+    case p: MongoPartition if index.equals(p.index) && queryBounds.equals(p.queryBounds) && locations.equals(p.locations) => true
+    case _ => false
+  }
+}
