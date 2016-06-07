@@ -18,7 +18,7 @@ package com.mongodb.spark.rdd.partitioner
 
 import scala.util.{Failure, Success, Try}
 
-import org.bson.Document
+import org.bson.{BsonBoolean, BsonDocument}
 import com.mongodb.MongoCommandException
 import com.mongodb.spark.MongoConnector
 import com.mongodb.spark.config.ReadConfig
@@ -28,27 +28,30 @@ import com.mongodb.spark.config.ReadConfig
  *
  * Checks if the collection is sharded then:
  *  - If sharded uses the [[MongoShardedPartitioner]] to partition the collection by shard chunks
- *  - If non sharded uses the [[MongoSplitVectorPartitioner]] to partition the collection by using the `splitVector` command.
+ *  - If non sharded uses the [[MongoSamplePartitioner]] to partition on MongoDB 3.2+ otherwise [[MongoPaginationPartitioner]]
+ *  - If the collection doesn't exist uses the [[MongoSinglePartitioner]]
  *
  * @since 1.0
  */
-case object DefaultMongoPartitioner extends MongoPartitioner {
+class DefaultMongoPartitioner extends MongoPartitioner {
 
-  override def partitions(connector: MongoConnector, readConfig: ReadConfig): Array[MongoPartition] = {
-    val collStatsCommand: Document = new Document("collStats", readConfig.collectionName)
-    val partitioner = Try(connector.withDatabaseDo(readConfig, { db => db.runCommand(collStatsCommand) })) match {
-      case Success(result) => result.getBoolean("sharded").asInstanceOf[Boolean] match {
-        case true  => MongoShardedPartitioner
-        case false => MongoSplitVectorPartitioner
+  override def partitions(connector: MongoConnector, readConfig: ReadConfig, pipeline: Array[BsonDocument]): Array[MongoPartition] = {
+    val partitioner = Try(PartitionerHelper.collStats(connector, readConfig)) match {
+      case Success(stats) => stats.getBoolean("sharded", new BsonBoolean(false)).getValue match {
+        case true => MongoShardedPartitioner
+        case false if connector.hasSampleAggregateOperator(readConfig) => MongoSamplePartitioner
+        case false => MongoPaginationPartitioner
       }
       case Failure(ex: MongoCommandException) if ex.getErrorMessage.endsWith("not found.") =>
-        logWarning(s"Could not find collection (${readConfig.collectionName}), using single partition")
+        logInfo(s"Could not find collection (${readConfig.collectionName}), using single partition")
         MongoSinglePartitioner
       case Failure(e) =>
-        logWarning(s"Could not get collection statistics, using single partition. Server errmsg: ${e.getMessage}")
-        MongoSinglePartitioner
+        logWarning(s"Could not get collection statistics. Server errmsg: ${e.getMessage}")
+        throw e
     }
-    partitioner.partitions(connector, readConfig)
+    partitioner.partitions(connector, readConfig, pipeline)
   }
 
 }
+
+case object DefaultMongoPartitioner extends DefaultMongoPartitioner

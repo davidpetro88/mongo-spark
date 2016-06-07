@@ -56,6 +56,20 @@ ssc.awaitTermination()
 
 Note: The Mongo Spark Connector only supports streams a sink.
 
+## What permissions do the partitioners require?
+
+Partitioner                         | Permissions required
+------------------------------------|-----------------------------------------------------------------------------------------
+`MongoFixedNumberPartitioner`       | Read collection
+`MongoPaginationPartitioner`        | Read collection
+`MongoSamplePartitioner`            | Read collection
+`MongoSinglePartitioner`            | Read collection
+`MongoShardedPartitioner`           | Read `config` database. Reads from the `chunks` and `shards` collections.
+`MongoSplitVectorPartitioner`       | Runs the `SplitVector` command. Requires `clusterManager` role or a custom permission.
+
+The `DefaultMongoPartitioner` is a special case as for sharded collections it uses the `MongoShardedPartitioner` otherwise for MongoDB 3.2+ 
+it will use the `MongoSamplePartitioner` but will fallback to the `MongoPaginationPartitioner` for older versions.
+
 -----
 
 [Next - Changelog](7-Changelog.md)
