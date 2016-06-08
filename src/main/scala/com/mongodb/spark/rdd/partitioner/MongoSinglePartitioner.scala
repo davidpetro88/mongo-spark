@@ -31,17 +31,9 @@ import com.mongodb.spark.config.ReadConfig
  */
 class MongoSinglePartitioner extends MongoPartitioner {
 
-  private var _partitions: Option[Array[MongoPartition]] = None
-
   override def partitions(connector: MongoConnector, readConfig: ReadConfig,
                           pipeline: Array[BsonDocument] = Array.empty[BsonDocument]): Array[MongoPartition] = {
-    _partitions.isDefined match {
-      case true => _partitions.get
-      case false =>
-        val partitionKey = "_id"
-        _partitions = Some(PartitionerHelper.createPartitions(partitionKey, Seq.empty[BsonValue], PartitionerHelper.locations(connector)))
-        _partitions.get
-    }
+    PartitionerHelper.createPartitions("_id", Seq.empty[BsonValue], PartitionerHelper.locations(connector))
   }
 }
 

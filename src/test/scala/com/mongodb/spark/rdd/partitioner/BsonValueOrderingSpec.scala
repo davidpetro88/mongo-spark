@@ -72,6 +72,16 @@ class BsonValueOrderingSpec extends FlatSpec with Matchers {
     val data: Seq[BsonValue] = Seq(new BsonInt32(1), new BsonInt64(2), new BsonDouble(3.0), new BsonDouble(4.0), new BsonInt64(5), new BsonInt32(6))
     val ordered = Random.shuffle(data).sorted
     ordered should equal(data)
+
+    val longAndDoubleData: Seq[BsonValue] = Seq(
+      new BsonDouble(Double.NegativeInfinity),
+      new BsonDouble(Long.MinValue), new BsonInt64(Long.MinValue + 1),
+      new BsonDouble(Double.MinPositiveValue), new BsonInt64(1L),
+      new BsonInt64(Long.MaxValue), new BsonDouble(Long.MaxValue + 1.0),
+      new BsonDouble(Double.PositiveInfinity))
+
+    val orderedLongsAndDouble = Random.shuffle(longAndDoubleData).sorted
+    orderedLongsAndDouble should equal(longAndDoubleData)
   }
 
   it should "compare string types correctly" in {

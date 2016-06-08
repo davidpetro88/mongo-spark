@@ -16,95 +16,30 @@
 
 package com.mongodb.spark.rdd.partitioner
 
-import scala.util.{Failure, Success, Try}
-
 import org.bson.{BsonDocument, BsonValue}
-import com.mongodb.MongoCommandException
 import com.mongodb.client.MongoCollection
 import com.mongodb.client.model.{Projections, Sorts}
 import com.mongodb.spark.MongoConnector
 import com.mongodb.spark.config.ReadConfig
 
-/**
- * The Pagination Partitioner.
- *
- * Uses the `collStats` command and the average document size to estimate the partition boundaries.
- *
- * $configurationProperties
- *
- *  - [[partitionKeyProperty partitionkey]], the field to partition the collection by. The field should be indexed and contain unique values.
- *     Defaults to `_id`.
- *  - [[partitionSizeMBProperty partitionsizemb]], the size (in MB) for each partition. Defaults to `64`.
- *
- *
- * '''Note:''' This can be a expensive operation as it creates 1 cursor for every estimated `partitionSizeMB`s worth of documents.
- *
- * @since 1.0
- */
-class MongoPaginationPartitioner extends MongoPartitioner {
+private[partitioner] trait MongoPaginationPartitioner {
 
   private implicit object BsonValueOrdering extends BsonValueOrdering
-  private val DefaultPartitionKey = "_id"
-  private val DefaultPartitionSizeMB = "64"
 
-  /**
-   * The partition key property
-   */
-  val partitionKeyProperty = "partitionKey".toLowerCase()
-
-  /**
-   * The partition size MB property
-   */
-  val partitionSizeMBProperty = "partitionSizeMB".toLowerCase()
-
-  /**
-   * Calculate the Partitions
-   *
-   * @param connector  the MongoConnector
-   * @param readConfig the [[com.mongodb.spark.config.ReadConfig]]
-   * @return the partitions
-   */
-  override def partitions(connector: MongoConnector, readConfig: ReadConfig, pipeline: Array[BsonDocument]): Array[MongoPartition] = {
-
-    Try(PartitionerHelper.collStats(connector, readConfig)) match {
-      case Success(results) =>
-        val partitionKey = readConfig.partitionerOptions.getOrElse(partitionKeyProperty, DefaultPartitionKey)
-        val partitionSizeInBytes = readConfig.partitionerOptions.getOrElse(partitionSizeMBProperty, DefaultPartitionSizeMB).toInt * 1024 * 1024
-        val count = results.getNumber("count").longValue()
-        val avgObjSizeInBytes = results.getNumber("avgObjSize").longValue()
-        val size = results.getNumber("size").longValue()
-        val numberOfPartitions = math.floor(size / partitionSizeInBytes.toFloat).toInt
-        val estNumDocumentsPerPartition: Int = math.floor(partitionSizeInBytes.toFloat / avgObjSizeInBytes).toInt
-
-        val rightHandBoundaries = estNumDocumentsPerPartition >= count match {
-          case true => Seq.empty[BsonValue]
-          case false =>
-            val skipValues = (0 to numberOfPartitions.toInt).map(i => i * estNumDocumentsPerPartition)
-            skipValues.map(i => connector.withCollectionDo(readConfig, { coll: MongoCollection[BsonDocument] =>
-              i >= count match {
-                case true => None
-                case false =>
-                  Option(coll.find()
-                    .skip(i)
-                    .limit(-1)
-                    .projection(Projections.include(partitionKey))
-                    .sort(Sorts.ascending(partitionKey))
-                    .first())
-                    .map(_.get(partitionKey))
-              }
-            })).collect({ case Some(boundary) => boundary })
-        }
-
-        PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries.sorted, PartitionerHelper.locations(connector))
-      case Failure(ex: MongoCommandException) if ex.getErrorMessage.endsWith("not found.") =>
-        logInfo(s"Could not find collection (${readConfig.collectionName}), using a single partition")
-        MongoSinglePartitioner.partitions(connector, readConfig, pipeline)
-      case Failure(e) =>
-        logWarning(s"Could not get collection statistics. Server errmsg: ${e.getMessage}")
-        throw e
-    }
+  def calculateSkipPartitions(connector: MongoConnector, readConfig: ReadConfig, partitionKey: String, count: Long, skipValues: Seq[Int]): Seq[BsonValue] = {
+    skipValues.map(i => connector.withCollectionDo(readConfig, { coll: MongoCollection[BsonDocument] =>
+      i >= count match {
+        case true => None
+        case false =>
+          Option(coll.find()
+            .skip(i)
+            .limit(-1)
+            .projection(Projections.include(partitionKey))
+            .sort(Sorts.ascending(partitionKey))
+            .first())
+            .map(_.get(partitionKey))
+      }
+    })).collect({ case Some(boundary) => boundary }).sorted
   }
 
 }
-
-case object MongoPaginationPartitioner extends MongoPaginationPartitioner

@@ -19,18 +19,18 @@ package com.mongodb.spark.rdd.partitioner
 import org.bson._
 import com.mongodb.spark._
 
-class MongoFixedNumberPartitionerSpec extends RequiresMongoDB {
+class MongoPaginateByCountPartitionerSpec extends RequiresMongoDB {
 
   private val partitionKey = "_id"
   private val pipeline = Array.empty[BsonDocument]
 
-  "MongoFixedNumberPartitioner" should "partition the database as expected" in withSparkContext() { sc =>
+  "MongoPaginateByCountPartitioner" should "partition the database as expected" in withSparkContext() { sc =>
     sc.parallelize((0 to 1000).map(i => BsonDocument.parse(s"{ _id: $i }"))).saveToMongoDB()
 
     val rightHandBoundaries = (0 to 1000 by 100).map(x => new BsonInt32(x))
     val locations = PartitionerHelper.locations(MongoConnector(sparkConf))
     val expectedPartitions = PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries, locations)
-    val partitions = MongoFixedNumberPartitioner.partitions(
+    val partitions = MongoPaginateByCountPartitioner.partitions(
       mongoConnector,
       readConfig.copy(partitionerOptions = Map("numberOfPartitions" -> "10")), pipeline
     )
@@ -44,16 +44,15 @@ class MongoFixedNumberPartitionerSpec extends RequiresMongoDB {
     val rightHandBoundaries = (0 to 10).map(x => new BsonInt32(x))
     val locations = PartitionerHelper.locations(MongoConnector(sparkConf))
     val expectedPartitions = PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries, locations)
-    val partitions = MongoFixedNumberPartitioner.partitions(
+    val partitions = MongoPaginateByCountPartitioner.partitions(
       mongoConnector,
       readConfig.copy(partitionerOptions = Map("numberOfPartitions" -> "100")), pipeline
     )
-
     partitions should equal(expectedPartitions)
   }
 
   it should "handle no collection" in {
-    val expectedPartitions = MongoFixedNumberPartitioner.partitions(mongoConnector, readConfig, pipeline)
-    MongoPaginationPartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
+    val expectedPartitions = MongoPaginateByCountPartitioner.partitions(mongoConnector, readConfig, pipeline)
+    MongoPaginateByCountPartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
   }
 }

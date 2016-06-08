@@ -26,26 +26,26 @@ import com.mongodb.spark.MongoConnector
 import com.mongodb.spark.config.ReadConfig
 
 /**
- * The Fixed Number Partitioner.
+ * The pagination by size partitioner.
  *
- * Partitions the collection into a fixed number of partitions.
+ * Paginates the collection into partitions based on their size.  Uses the `collStats` command and the average document size to
+ * estimate the partition boundaries.
  *
  * $configurationProperties
  *
  *  - [[partitionKeyProperty partitionkey]], the field to partition the collection by. The field should be indexed and contain unique values.
  *     Defaults to `_id`.
- *  - [[numberOfPartitionsProperty numberofpartitions]], the maximum number of partitions to create. Defaults to `64`.
+ *  - [[partitionSizeMBProperty partitionsizemb]], the size (in MB) for each partition. Defaults to `64`.
  *
  *
- * '''Note:''' This can be a expensive operation as it creates 1 cursor for every partition.
+ * '''Note:''' This can be a expensive operation as it creates 1 cursor for every estimated `partitionSizeMB`s worth of documents.
  *
  * @since 1.0
  */
-class MongoFixedNumberPartitioner extends MongoPartitioner {
+class MongoPaginateBySizePartitioner extends MongoPartitioner with MongoPaginationPartitioner {
 
-  private implicit object BsonValueOrdering extends BsonValueOrdering
   private val DefaultPartitionKey = "_id"
-  private val DefaultNumberOfPartitions = "64"
+  private val DefaultPartitionSizeMB = "64"
 
   /**
    * The partition key property
@@ -53,9 +53,9 @@ class MongoFixedNumberPartitioner extends MongoPartitioner {
   val partitionKeyProperty = "partitionKey".toLowerCase()
 
   /**
-   * The number of partitions property
+   * The partition size MB property
    */
-  val numberOfPartitionsProperty = "numberOfPartitions".toLowerCase()
+  val partitionSizeMBProperty = "partitionSizeMB".toLowerCase()
 
   /**
    * Calculate the Partitions
@@ -69,31 +69,21 @@ class MongoFixedNumberPartitioner extends MongoPartitioner {
     Try(PartitionerHelper.collStats(connector, readConfig)) match {
       case Success(results) =>
         val partitionKey = readConfig.partitionerOptions.getOrElse(partitionKeyProperty, DefaultPartitionKey)
-        val maxNumberOfPartitions = readConfig.partitionerOptions.getOrElse(numberOfPartitionsProperty, DefaultNumberOfPartitions).toInt
+        val partitionSizeInBytes = readConfig.partitionerOptions.getOrElse(partitionSizeMBProperty, DefaultPartitionSizeMB).toInt * 1024 * 1024
         val count = results.getNumber("count").longValue()
-        val numberOfPartitions = if (count < maxNumberOfPartitions) count else maxNumberOfPartitions
-        val numDocumentsPerPartition = math.floor(count / numberOfPartitions).toInt
+        val avgObjSizeInBytes = results.getNumber("avgObjSize").longValue()
+        val size = results.getNumber("size").longValue()
+        val numberOfPartitions = math.floor(size / partitionSizeInBytes.toFloat).toInt
+        val estNumDocumentsPerPartition: Int = math.floor(partitionSizeInBytes.toFloat / avgObjSizeInBytes).toInt
 
-        if (count == numberOfPartitions) {
-          logWarning("Inefficient partitioning, creating a partition per document. Decrease the `numberOfPartitions` property.")
+        val rightHandBoundaries = estNumDocumentsPerPartition >= count match {
+          case true => Seq.empty[BsonValue]
+          case false =>
+            val skipValues = (0 to numberOfPartitions.toInt).map(i => i * estNumDocumentsPerPartition)
+            calculateSkipPartitions(connector, readConfig, partitionKey, count, skipValues)
         }
 
-        val skipValues = (0 to numberOfPartitions.toInt).map(i => i * numDocumentsPerPartition)
-        val rightHandBoundaries = skipValues.map(i => connector.withCollectionDo(readConfig, { coll: MongoCollection[BsonDocument] =>
-          i >= count match {
-            case true => None
-            case false =>
-              Option(coll.find()
-                .skip(i)
-                .limit(-1)
-                .projection(Projections.include(partitionKey))
-                .sort(Sorts.ascending(partitionKey))
-                .first())
-                .map(_.get(partitionKey))
-          }
-        })).collect({ case Some(boundary) => boundary })
-
-        PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries.sorted, PartitionerHelper.locations(connector))
+        PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries, PartitionerHelper.locations(connector))
       case Failure(ex: MongoCommandException) if ex.getErrorMessage.endsWith("not found.") =>
         logInfo(s"Could not find collection (${readConfig.collectionName}), using a single partition")
         MongoSinglePartitioner.partitions(connector, readConfig, pipeline)
@@ -105,4 +95,4 @@ class MongoFixedNumberPartitioner extends MongoPartitioner {
 
 }
 
-case object MongoFixedNumberPartitioner extends MongoFixedNumberPartitioner
+case object MongoPaginateBySizePartitioner extends MongoPaginateBySizePartitioner

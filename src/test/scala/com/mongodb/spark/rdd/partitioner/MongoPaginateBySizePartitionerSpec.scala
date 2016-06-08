@@ -19,20 +19,20 @@ package com.mongodb.spark.rdd.partitioner
 import org.bson._
 import com.mongodb.spark.{MongoConnector, RequiresMongoDB}
 
-class MongoPaginationPartitionerSpec extends RequiresMongoDB {
+class MongoPaginateBySizePartitionerSpec extends RequiresMongoDB {
 
   private val partitionKey = "_id"
   private val pipeline = Array.empty[BsonDocument]
 
   // scalastyle:off magic.number
-  "MongoPaginationPartitioner" should "partition the database as expected" in {
+  "MongoPaginateBySizePartitioner" should "partition the database as expected" in {
     if (!serverAtLeast(3, 2)) cancel("Testing on wiretiger only, so to have predictable partition sizes.")
     loadSampleData(10)
 
     val rightHandBoundaries = (1 to 100 by 10).map(x => new BsonString(f"$x%05d"))
     val locations = PartitionerHelper.locations(MongoConnector(sparkConf))
     val expectedPartitions = PartitionerHelper.createPartitions(partitionKey, rightHandBoundaries, locations)
-    val partitions = MongoPaginationPartitioner.partitions(
+    val partitions = MongoPaginateBySizePartitioner.partitions(
       mongoConnector,
       readConfig.copy(partitionerOptions = Map("partitionSizeMB" -> "1")), pipeline
     )
@@ -40,7 +40,7 @@ class MongoPaginationPartitionerSpec extends RequiresMongoDB {
     partitions should equal(expectedPartitions)
 
     val singlePartition = PartitionerHelper.createPartitions(partitionKey, Seq.empty[BsonValue], locations)
-    val largerSizedPartitions = MongoPaginationPartitioner.partitions(
+    val largerSizedPartitions = MongoPaginateBySizePartitioner.partitions(
       mongoConnector,
       readConfig.copy(partitionerOptions = Map("partitionSizeMB" -> "10")), pipeline
     )
@@ -51,12 +51,12 @@ class MongoPaginationPartitionerSpec extends RequiresMongoDB {
   it should "have a default bounds of min to max key" in {
     collection.insertOne(new Document())
     val expectedPartitions = MongoSinglePartitioner.partitions(mongoConnector, readConfig, pipeline)
-    MongoPaginationPartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
+    MongoPaginateBySizePartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
   }
 
   it should "handle no collection" in {
     val expectedPartitions = MongoSinglePartitioner.partitions(mongoConnector, readConfig, pipeline)
-    MongoPaginationPartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
+    MongoPaginateBySizePartitioner.partitions(mongoConnector, readConfig, pipeline) should equal(expectedPartitions)
   }
 }
 
