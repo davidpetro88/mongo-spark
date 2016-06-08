@@ -34,3 +34,5 @@ class HalfwayPartitioner extends MongoPartitioner {
     )
   }
 }
+
+case object HalfwayPartitioner extends HalfwayPartitioner
